@@ -17,9 +17,9 @@ Commit SHA: See the successful GitHub Actions run on the repository main branch.
 ## Verification
 
 - Automated GitHub workflows: backend, native C++ integration, standalone C++, frontend, Docker, PostgreSQL storage contract, bounded in-process fanout benchmark, controlled fault-injection benchmark.
-- Fault-injection evidence: https://github.com/olabs123-hue/-MarketStream/actions/runs/45196355759
-- Historical Python fanout evidence: https://github.com/olabs123-hue/-MarketStream/actions/runs/45190849808
-- Latest workflow results: https://github.com/olabs123-hue/-MarketStream/actions
+- Fault-injection evidence: https://github.com/olabs123-hue/MarketStream/actions/runs/45196355759
+- Historical Python fanout evidence: https://github.com/olabs123-hue/MarketStream/actions/runs/45190849808
+- Latest workflow results: https://github.com/olabs123-hue/MarketStream/actions
 - Live app: https://marketstream-sim-olabs123.onrender.com
 
 ## Boundaries
