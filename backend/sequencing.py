@@ -53,6 +53,23 @@ class SequencedBook:
         ordered = sorted(levels.items(), key=lambda item: item[0], reverse=reverse)
         return [[p / 100, qty] for p, qty in ordered]
 
+    def make_delta(self, target: dict) -> dict:
+        """Build simulated absolute-quantity updates from two full snapshots.
+
+        Used only by the educational producer; not an exchange market feed.
+        """
+        if self.last_tick is None or self.needs_snapshot:
+            return {**target, "event_type": "snapshot"}
+        changed = {}
+        for side in ("bids", "asks"):
+            before = {int(round(float(p) * 100)): float(q) for p, q in self.last_tick[side]}
+            after = {int(round(float(p) * 100)): float(q) for p, q in target[side]}
+            updates = [[p / 100, q] for p, q in after.items() if before.get(p) != q]
+            updates.extend([[p / 100, 0] for p in before if p not in after])
+            changed[side] = updates
+        return {**{k: v for k, v in target.items() if k not in ("bids", "asks")},
+                **changed, "event_type": "delta"}
+
     def apply(self, event: dict) -> dict:
         sequence = event.get("sequence")
         if type(sequence) is not int or sequence < 0:
