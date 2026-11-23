@@ -122,3 +122,13 @@ Run `python -m pytest -q tests` for new shared-feed tests covering identical sna
 - **Measured benchmark script:** `python -m scripts.benchmark_fanout --subscribers 20 --ticks 10000` measures only Python in-process queue publication. Its output is machine-specific and **cannot** be described as network throughput, end-to-end latency, or C++ engine throughput.
 
 **Not yet implemented:** Cross-instance stream coordination, durable hosted PostgreSQL history, multi-instance replay, rate-limiting at the edge or production-grade access controls. Hosting remains free-tier simulated market data with ephemeral SQLite observations. No real market orders or transactions are possible.
+
+
+## v0.4.1 failure recovery and operational counters
+
+- Regression tests cover reconnect-after-disconnect, a simulated producer exception followed by a new subscription, multi-symbol shutdown, and queue-shedding counters.
+- The hub catches producer exceptions, increments `producer_failures`, signals subscribers that the stream has stopped, and permits a fresh subscription to start a new generator. A new generator starts at sequence zero; **this is recovery, not continuity/replay**.
+- `GET /api/stream-status` now also reports cumulative per-process `ticks_generated`, `queue_updates_dropped` and `producer_failures` counters for basic observability. These values reset on process restart and are **not** persistent SLA metrics.
+- Existing in-process fanout benchmark can be run as `python -m scripts.benchmark_fanout --subscribers 20 --ticks 10000`. Results are not an end-to-end WebSocket benchmark.
+
+All monitoring remains anonymous aggregate instrumentation for fictional market data. No login, real-market data or paid infrastructure was introduced.
