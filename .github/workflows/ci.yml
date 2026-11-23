@@ -27,6 +27,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: g++ -std=c++17 -Wall -Wextra -pedantic engine/order_book.cpp -o /tmp/orderbook && /tmp/orderbook
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: g++ -std=c++17 -O2 -fPIC -shared -Wall -Wextra -Werror engine/book_native.cpp -o engine/libmarketbook.so
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt pytest
+      - run: MARKETSTREAM_REQUIRE_NATIVE=1 python -m pytest -q tests
   container:
     runs-on: ubuntu-latest
     steps:
