@@ -111,3 +111,14 @@ Backend tests: `python -m pytest -q tests`. Native mode: `g++ -std=c++17 -O2 -fP
 - **Single-process only:** Multiple Uvicorn workers or deployed instances each run separate simulated feeds. This is not Redis/Kafka fanout, and the history is not shared between instances.
 
 Run `python -m pytest -q tests` for new shared-feed tests covering identical snapshots, one write per tick, bounded queues, invalid symbols and producer cleanup.
+
+
+## v0.4 reliability improvements (single-process demo)
+
+- **Connection admission limits:** By default at most 60 total WebSocket subscribers and 30 subscribers per symbol *per server process*. Excess connections receive WebSocket close code `1013`. Set `MARKETSTREAM_MAX_CLIENTS` and `MARKETSTREAM_MAX_PER_SYMBOL` (positive integers) to adjust the limits.
+- **Stalled send timeout:** A WebSocket send that exceeds five seconds is dropped and its subscriber is removed. This protects the application handler from waiting indefinitely, but is not a substitute for reverse-proxy rate limiting, abuse protection or an egress quota.
+- **Status endpoint:** `GET /api/stream-status` returns simulated mode, active symbol count and subscriber counts for the current process. No individual user identifiers are reported.
+- **Regression coverage:** Unit tests for caps and queue cleanup, plus WebSocket admission tests.
+- **Measured benchmark script:** `python -m scripts.benchmark_fanout --subscribers 20 --ticks 10000` measures only Python in-process queue publication. Its output is machine-specific and **cannot** be described as network throughput, end-to-end latency, or C++ engine throughput.
+
+**Not yet implemented:** Cross-instance stream coordination, durable hosted PostgreSQL history, multi-instance replay, rate-limiting at the edge or production-grade access controls. Hosting remains free-tier simulated market data with ephemeral SQLite observations. No real market orders or transactions are possible.
