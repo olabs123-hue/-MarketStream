@@ -13,6 +13,7 @@ from backend.history import record, recent, replay, backend_name
 from backend.hub import MarketHub, CapacityExceeded
 from backend.stateful import StatefulBook
 from backend.sequencing import SequencedBook
+from backend.analytics import AnalyticsBook
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -54,7 +55,7 @@ def persist_tick(symbol: str, tick: dict) -> None:
     record(symbol, tick['price'], tick['timestamp'])
 
 
-hub = MarketHub(SYMBOLS, snapshot, persist_tick, max_clients=max(1, int(os.getenv('MARKETSTREAM_MAX_CLIENTS', '60'))), max_per_symbol=max(1, int(os.getenv('MARKETSTREAM_MAX_PER_SYMBOL', '30'))), processor_factory=lambda symbol: SequencedBook(StatefulBook()))
+hub = MarketHub(SYMBOLS, snapshot, persist_tick, max_clients=max(1, int(os.getenv('MARKETSTREAM_MAX_CLIENTS', '60'))), max_per_symbol=max(1, int(os.getenv('MARKETSTREAM_MAX_PER_SYMBOL', '30'))), processor_factory=lambda symbol: AnalyticsBook(SequencedBook(StatefulBook())))
 
 
 @asynccontextmanager
@@ -64,7 +65,7 @@ async def lifespan(app: FastAPI):
     finally:
         await hub.close()
 
-app = FastAPI(title='MarketStream', version='0.1.0', lifespan=lifespan)
+app = FastAPI(title='MarketStream', version='1.1.0', lifespan=lifespan)
 
 
 @app.get('/health')
@@ -75,6 +76,19 @@ def health():
 @app.get('/api/stream-status')
 def stream_status():
     return {'mode': 'simulation', **hub.connection_stats()}
+
+
+@app.get('/api/analytics/{symbol}')
+def latest_analytics(symbol: str):
+    if symbol not in SYMBOLS:
+        raise HTTPException(404, 'Unknown symbol')
+    latest = hub.latest_ticks.get(symbol)
+    if latest is None:
+        return {'symbol': symbol, 'simulated': True, 'status': 'no_active_feed',
+                'analytics': None}
+    return {'symbol': symbol, 'simulated': True, 'status': 'active',
+            'sequence': latest['sequence'], 'timestamp': latest['timestamp'],
+            'analytics': latest['analytics']}
 
 
 @app.get('/api/markets')
