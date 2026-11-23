@@ -1,0 +1,23 @@
+name: MarketStream Fanout Performance Evidence
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  in-process-benchmark:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Measure queue fanout only (not end-to-end WebSocket throughput)
+        run: |
+          python -m scripts.benchmark_fanout --subscribers 20 --ticks 10000 --warmup 1000 --output fanout-benchmark.json
+      - name: Preserve measurement with run metadata
+        run: |
+          python -c "import json,os; p='fanout-benchmark.json'; d=json.load(open(p)); d['git_commit']=os.getenv('GITHUB_SHA'); d['github_run_id']=os.getenv('GITHUB_RUN_ID'); open(p,'w').write(json.dumps(d,indent=2)+'\n')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fanout-benchmark-results
+          path: fanout-benchmark.json
+          retention-days: 30
