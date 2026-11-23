@@ -42,3 +42,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t marketstream:ci .
+
+  stateful-book:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and test stateful level-book invariants
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic tests/level_book_test.cpp -o /tmp/marketstream-level-book
+          /tmp/marketstream-level-book
+      - name: Compile native update benchmark
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic benchmarks/level_book_bench.cpp -o /tmp/marketstream-book-bench
+          /tmp/marketstream-book-bench 10000
