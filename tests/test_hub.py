@@ -96,3 +96,20 @@ def test_invalid_limits_rejected():
         assert False, "invalid client cap must fail"
     except ValueError:
         pass
+
+
+def test_operational_counters_record_queue_shedding():
+    async def scenario():
+        hub = MarketHub({"SOL-USD": 10}, lambda s, p, i: {"sequence": i}, interval=60)
+        q = hub.subscribe("SOL-USD")
+        try:
+            await asyncio.wait_for(q.get(), timeout=2)
+            before = hub.connection_stats()["queue_updates_dropped"]
+            hub.publish("SOL-USD", {"sequence": 20})
+            hub.publish("SOL-USD", {"sequence": 21})
+            assert hub.connection_stats()["queue_updates_dropped"] == before + 1
+            assert q.get_nowait()["sequence"] == 21
+        finally:
+            hub.unsubscribe("SOL-USD", q)
+            await hub.close()
+    asyncio.run(scenario())
