@@ -165,3 +165,10 @@ This deterministic offline scenario repeatedly marks the **currently active fict
 GitHub Actions must pass backend, native C++ integration, frontend, standalone C++, Docker, PostgreSQL storage-contract, fanout benchmark, and fault-injection benchmark checks before deployment. Passing a test does not imply security accreditation or production-level robustness.
 
 MarketStream remains a **portfolio-grade educational simulation**. The live Render free service uses ephemeral SQLite by default; optional hosted PostgreSQL is not provisioned. Its simulated vendor data is generated from a shared reference-price process, not independently sampled markets.
+
+
+### Verified v1.3 fault-injection evidence
+
+The [controlled failover workflow run](https://github.com/olabs123-hue/-MarketStream/actions/runs/45196355759) on 23 November 2026 reported **200 / 200 successful simulated source switches**, with **p95 2.964 microseconds** for the synchronous in-memory failover selection; the sample window was the last 256 measurements on a GitHub-hosted Python 3.12.16 Linux runner. Source-read + normalization p95 was **2.414 microseconds** over the last 256 events. These figures **exclude all network activity**, C++ processing, database writes and WebSocket delivery. They are not Bloomberg performance metrics, external vendor recovery time or an exchange latency claim.
+
+The verified test scenario is reproducible through `python -m scripts.benchmark_failover --events 2000 --fail-every 10`. Download the workflow's `controlled-failover-evidence` artifact for exact measurements and run metadata.
