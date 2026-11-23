@@ -107,6 +107,19 @@ The independent C++ benchmark is in `benchmarks/level_book_bench.cpp`; its resul
 - There are **no user accounts, trade execution, brokerage connections, settlement, P&L, investment signals, or real financial prices**.
 - The size-one subscriber queue bounds in-process pending snapshots but is not a network-egress cap or production anti-abuse system.
 
+## Bloomberg-focused engineering extension (v1.1)
+
+This extension models the **data-validation and quote-analytics work** useful in financial-information engineering. It is not an implementation of Bloomberg's proprietary market-data products.
+
+- `backend/analytics.py` computes deterministic quote statistics from the already validated synthetic L2 book: **mid-price**, **bid–ask spread in basis points**, **best-level size-weighted microprice**, **total visible synthetic depth by side**, and **depth imbalance**.
+- Prices are normalized to integer cents and sizes to integer thousandths, consistent with the C++ bridge. Invalid book depth, locked/crossed quotes, non-finite prices, negative sizes, duplicate or misordered levels are rejected.
+- Analytics are attached **after** sequence validation and native C++ processing, preserving the existing synthetic full-snapshot/delta pipeline. The React terminal displays spread (bps), microprice and depth imbalance.
+- `GET /api/analytics/{symbol}` returns only the most recent processed synthetic quote for **an actively subscribed symbol on this server process**. If nobody is subscribed, it returns `status: no_active_feed` and `analytics: null`. It is not an archival quote API.
+- `tests/test_analytics.py` checks hand-calculated formula values, book-validation failures, live WebSocket vs REST consistency and native/fallback adapters.
+- These are **descriptive analytics, not predictive trading signals**. No executions or actual trade prints exist, so claims such as VWAP, trade volume or real exchange performance would be unsupported.
+
+Formula conventions: `spread_bps = 10000 × (best_ask − best_bid) / midpoint`; `imbalance = (sum_bid_size − sum_ask_size)/(sum_bid_size + sum_ask_size)`; `microprice = (best_ask × best_bid_size + best_bid × best_ask_size)/(best_bid_size + best_ask_size)`.
+
 ## Roadmap beyond v1.0
 
 Cross-instance message distribution, persistent PostgreSQL deployment when affordable, genuine end-to-end load tests under controlled conditions, structured event logs and advanced native-engine property tests.
