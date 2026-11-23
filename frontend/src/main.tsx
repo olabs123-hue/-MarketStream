@@ -4,7 +4,7 @@ import {Activity, ArrowDownRight, ArrowUpRight, CircleDot, RefreshCw, Wifi, Wifi
 import {AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip} from 'recharts';
 import './style.css';
 
-type Tick={symbol:string;sequence:number;timestamp:string;price:number;change_pct:number;bids:number[][];asks:number[][];spread:number;simulated:boolean};
+type Tick={symbol:string;sequence:number;timestamp:string;price:number;change_pct:number;bids:number[][];asks:number[][];spread:number;processor?:string;simulated:boolean};
 const symbols=['BTC-USD','ETH-USD','SOL-USD'];
 const money=(n:number)=>n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 function App(){
@@ -33,7 +33,7 @@ function App(){
  <div className="columns"><section className="panel"><div className="panel-title"><div><h2>Price movement</h2><p>Last {history.length} streamed observations</p></div><RefreshCw size={17}/></div><div className="chart">{history.length?<ResponsiveContainer width="100%" height="100%"><AreaChart data={history} margin={{top:20,right:12,left:-20,bottom:0}}><defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5f8bff" stopOpacity={.3}/><stop offset="1" stopColor="#5f8bff" stopOpacity={0}/></linearGradient></defs><CartesianGrid stroke="#263148" strokeDasharray="3 3"/><XAxis dataKey="n" stroke="#8a9bb9" tick={{fontSize:11}}/><YAxis domain={['auto','auto']} stroke="#8a9bb9" tick={{fontSize:11}} tickFormatter={(n:number)=>n.toFixed(0)}/><Tooltip formatter={(v)=>'$'+money(Number(v))}/><Area type="monotone" dataKey="price" stroke="#5f8bff" strokeWidth={2.5} fill="url(#fill)" isAnimationActive={false}/></AreaChart></ResponsiveContainer>:<div className="empty">Waiting for streaming observations…</div>}</div></section>
  <section className="panel book"><div className="panel-title"><div><h2>Order-book depth</h2><p>Synthetic level-2 snapshot</p></div><span className="small-tag">8 levels</span></div><div className="book-head"><span>Bid price</span><span>Size</span><span>Ask price</span><span>Size</span></div>{Array.from({length:8},(_,i)=><div className="book-row" key={i}><span className="bid">{tick?money(tick.bids[i][0]):'—'}</span><span>{tick?tick.bids[i][1]:'—'}</span><span className="ask">{tick?money(tick.asks[i][0]):'—'}</span><span>{tick?tick.asks[i][1]:'—'}</span></div>)}</section></div>
  {error&&<div className="error">{error}. The client will reconnect automatically.</div>}
- <footer>MarketStream v0.1 · Python WebSocket simulation feed · C++ reference order-book module is standalone and not integrated into this live stream</footer>
+ <footer>MarketStream v0.1 · Python WebSocket simulation feed · C++ order-book validation runs in container deployments</footer>
  </main></div>;
 }
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
