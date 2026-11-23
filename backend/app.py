@@ -11,6 +11,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Quer
 from backend.processor import top_of_book
 from backend.history import record, recent, replay, backend_name
 from backend.hub import MarketHub, CapacityExceeded
+from backend.stateful import StatefulBook
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -52,7 +53,7 @@ def persist_tick(symbol: str, tick: dict) -> None:
     record(symbol, tick['price'], tick['timestamp'])
 
 
-hub = MarketHub(SYMBOLS, snapshot, persist_tick, max_clients=max(1, int(os.getenv('MARKETSTREAM_MAX_CLIENTS', '60'))), max_per_symbol=max(1, int(os.getenv('MARKETSTREAM_MAX_PER_SYMBOL', '30'))))
+hub = MarketHub(SYMBOLS, snapshot, persist_tick, max_clients=max(1, int(os.getenv('MARKETSTREAM_MAX_CLIENTS', '60'))), max_per_symbol=max(1, int(os.getenv('MARKETSTREAM_MAX_PER_SYMBOL', '30'))), processor_factory=lambda symbol: StatefulBook())
 
 
 @asynccontextmanager
