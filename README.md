@@ -86,7 +86,7 @@ This is a **portfolio MVP**. It has no live financial data, durable hosted persi
 
 ## Future roadmap
 
-1. Extend the native C++ integration to stateful incremental order-book processing.
+1. Add protocol-style incremental market-depth events with sequence-gap detection and resynchronization (current integration reconciles successive full synthetic snapshots).
 2. Add cross-instance fanout through a broker and explicit WebSocket session limits.
 3. Replace ephemeral SQLite with PostgreSQL persistence and add deterministic replay.
 4. Add benchmark evidence and failure-recovery tests.
@@ -177,3 +177,12 @@ g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic benchmarks/level_book_bench.c
 ```
 
 **Integration boundary:** This stateful L2 engine is an independently tested reference component, **not yet wired into the live WebSocket feed**. The deployed feed still uses the existing C++ `ms_top_of_book` function to validate each synthetic snapshot. The new engine is not a trade matching engine, exchange feed handler, or production trading system. Native benchmark speed is *not* the latency of the WebSocket dashboard or transaction processing.
+
+
+## v0.8 — Live C++17 stateful level-book integration
+
+The *simulated* WebSocket producer now allocates an independent native C++17 book per active symbol. Each generated synthetic L2 snapshot is reconciled against the previous snapshot by deleting vanished price levels and inserting/replacing changed levels. The C++ C ABI validates unique positive price/quantity levels, rejects crossed books, and prepares updates off to the side so a rejected snapshot does not modify the accepted book.
+
+The Python adapter `backend/stateful.py` verifies native best bid, best ask, spread, and level counts against the generated snapshot before broadcasting, and publishes `processor: "cpp17-stateful"`, `book_levels`, `level_updates`, and `book_mode: "snapshot-delta-reconciliation"` in WebSocket messages. Locally, a labeled Python reference fallback is used if the shared library is absent. Render requires the native library.
+
+The native book lifetime is tied to the in-process symbol producer: when all subscribers disconnect or a producer fails, the book is closed; reconnecting starts a new simulated session at sequence zero. This is **full-snapshot-to-level-delta reconciliation**, not an exchange incremental feed decoder, an order-matching engine, or persistent order-book replay. Real exchange data and trading are not supported. Backend and native CI run the stateful book consistency tests.
