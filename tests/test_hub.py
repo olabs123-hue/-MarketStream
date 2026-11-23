@@ -57,3 +57,42 @@ def test_invalid_symbol_and_cleanup():
         assert hub._streams == {}
         await hub.close()
     asyncio.run(scenario())
+
+
+def test_capacity_caps_and_stats():
+    async def scenario():
+        from backend.hub import CapacityExceeded
+        hub = MarketHub({"BTC-USD": 100, "ETH-USD": 10},
+                        lambda s, p, i: {"sequence": i},
+                        interval=60, max_clients=2, max_per_symbol=1)
+        a = hub.subscribe("BTC-USD")
+        try:
+            assert hub.connection_stats()["connected_subscribers"] == 1
+            try:
+                hub.subscribe("BTC-USD")
+                assert False, "symbol cap not enforced"
+            except CapacityExceeded:
+                pass
+            b = hub.subscribe("ETH-USD")
+            try:
+                assert hub.connection_stats()["connected_subscribers"] == 2
+                try:
+                    hub.subscribe("ETH-USD")
+                    assert False, "global cap not enforced"
+                except CapacityExceeded:
+                    pass
+            finally:
+                hub.unsubscribe("ETH-USD", b)
+        finally:
+            hub.unsubscribe("BTC-USD", a)
+            await hub.close()
+        assert hub.connection_stats()["connected_subscribers"] == 0
+    asyncio.run(scenario())
+
+
+def test_invalid_limits_rejected():
+    try:
+        MarketHub({"BTC-USD": 1}, lambda s, p, i: {}, max_clients=0)
+        assert False, "invalid client cap must fail"
+    except ValueError:
+        pass
