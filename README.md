@@ -6,7 +6,7 @@ MarketStream is a **full-stack educational simulation** of a financial market-da
 
 ## Live demo status
 
-Not deployed yet. All prices, volume levels, and changes are simulated. No external market-data subscription or API key is required.
+**[Open the live simulated terminal](https://marketstream-sim-olabs123.onrender.com)** — hosted on Render's free tier. Docker and React production builds passed during initial deployment on 23 November 2026. All prices, volume levels, and changes are simulated. No external market-data subscription or API key is required.
 
 ## Features
 
