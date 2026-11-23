@@ -156,3 +156,24 @@ python -m scripts.benchmark_fanout --subscribers 20 --ticks 10000 --warmup 1000 
 **Scope:** Python in-process delivery to `asyncio.Queue(maxsize=1)` only. It excludes WebSocket serialization/network transmission, database recording, native C++ processing, exchange ingestion, and end-to-end response latency. The offered updates can replace previous updates in each subscriber's size-one queue; `attempted_queue_deliveries` is not confirmed consumer delivery. Compare results only with the same workload and environment; do not market these figures as financial trading latency.
 
 Additional tests validate the benchmark's reporting consistency and use multiple ASGI WebSocket clients to exercise the shared per-symbol producer. Restart and injected-failure recovery tests from v0.4.1 remain part of the backend test suite. No production load testing against the live free Render service is performed.
+
+
+## v0.7 stateful C++17 level-book engine
+
+A **separate native C++17 component** now supports incremental L2 price-level operations via `engine/level_book.hpp`:
+
+- Bid/ask level insertion and replacement using integer-cent prices and absolute synthetic quantities.
+- Zero-quantity level deletion, best-bid/best-ask/spread calculation, bounded levels per side, invalid-input rejection and non-crossing book invariants.
+- Dedicated native correctness cases in `tests/level_book_test.cpp`, compiled and run by GitHub Actions.
+- A separate single-threaded `std::map` replacement/top-of-book microbenchmark in `benchmarks/level_book_bench.cpp`, also checked in CI.
+
+To test locally:
+
+```bash
+g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic tests/level_book_test.cpp -o /tmp/level-book-test
+/tmp/level-book-test
+g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic benchmarks/level_book_bench.cpp -o /tmp/level-book-bench
+/tmp/level-book-bench 200000
+```
+
+**Integration boundary:** This stateful L2 engine is an independently tested reference component, **not yet wired into the live WebSocket feed**. The deployed feed still uses the existing C++ `ms_top_of_book` function to validate each synthetic snapshot. The new engine is not a trade matching engine, exchange feed handler, or production trading system. Native benchmark speed is *not* the latency of the WebSocket dashboard or transaction processing.
