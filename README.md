@@ -107,9 +107,9 @@ The independent C++ benchmark is in `benchmarks/level_book_bench.cpp`; its resul
 - There are **no user accounts, trade execution, brokerage connections, settlement, P&L, investment signals, or real financial prices**.
 - The size-one subscriber queue bounds in-process pending snapshots but is not a network-egress cap or production anti-abuse system.
 
-## Bloomberg-focused engineering extension (v1.1)
+## Quote analytics and validation (v1.1)
 
-This extension models the **data-validation and quote-analytics work** useful in financial-information engineering. It is not an implementation of Bloomberg's proprietary market-data products.
+This extension models the **data-validation and quote-analytics work** useful in financial-information engineering. It does not connect to external market-data providers.
 
 - `backend/analytics.py` computes deterministic quote statistics from the already validated synthetic L2 book: **mid-price**, **bid–ask spread in basis points**, **best-level size-weighted microprice**, **total visible synthetic depth by side**, and **depth imbalance**.
 - Prices are normalized to integer cents and sizes to integer thousandths, consistent with the C++ bridge. Invalid book depth, locked/crossed quotes, non-finite prices, negative sizes, duplicate or misordered levels are rejected.
