@@ -132,3 +132,14 @@ Run `python -m pytest -q tests` for new shared-feed tests covering identical sna
 - Existing in-process fanout benchmark can be run as `python -m scripts.benchmark_fanout --subscribers 20 --ticks 10000`. Results are not an end-to-end WebSocket benchmark.
 
 All monitoring remains anonymous aggregate instrumentation for fictional market data. No login, real-market data or paid infrastructure was introduced.
+
+
+## v0.5 optional PostgreSQL and deterministic observation replay
+
+- **Default demo stays free:** Without `MARKETSTREAM_DATABASE_URL`, history continues using local SQLite in `MARKETSTREAM_DB`. Render's free instance storage is ephemeral and may reset on replacement/restart.
+- **Optional PostgreSQL:** Set `MARKETSTREAM_DATABASE_URL` to an externally provisioned PostgreSQL connection URL when durable storage is available. This is an opt-in backend adapter, not an active hosted PostgreSQL database. Do not commit credentials or put database connection strings in frontend environment variables.
+- **Read-only cursor replay:** `GET /api/replay/{symbol}?after_id=0&limit=100` returns retained simulated observations in ascending database-ID order, a `next_after_id` cursor and `has_more` indicator (limit 1–500). Use the returned cursor for subsequent pages. This replays **stored observations**, not historical market trades or original live order-book state.
+- **Bounded retention:** Both backends retain at most 500 observations per symbol by default; replay cannot retrieve deleted history. This is a portfolio-scale storage contract, not an archival system.
+- **CI integration:** `.github/workflows/postgresql-history.yml` launches a temporary PostgreSQL 16 instance on GitHub Actions and runs the storage/replay contract tests. It does not create any cloud database or paid resource.
+
+This version does **not** provide cross-instance fanout, historical order-book reconstruction, exactly-once processing, or persistent Render storage unless a PostgreSQL service is explicitly configured. Existing simulated WebSocket endpoints and React chart remain unchanged.
