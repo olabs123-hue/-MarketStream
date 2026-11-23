@@ -1,5 +1,4 @@
 """Simulated streaming market data API. No real market data or investment functions."""
-import asyncio
 import math
 import random
 from contextlib import asynccontextmanager
@@ -9,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from backend.processor import top_of_book
 from backend.history import record, recent
+from backend.hub import MarketHub
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -46,9 +46,19 @@ def generate_path(symbol: str, count: int = 36, seed: int = 21) -> list[float]:
     return result
 
 
+def persist_tick(symbol: str, tick: dict) -> None:
+    record(symbol, tick['price'], tick['timestamp'])
+
+
+hub = MarketHub(SYMBOLS, snapshot, persist_tick)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    try:
+        yield
+    finally:
+        await hub.close()
 
 app = FastAPI(title='MarketStream', version='0.1.0', lifespan=lifespan)
 
@@ -84,19 +94,18 @@ async def market_stream(websocket: WebSocket, symbol: str):
         await websocket.close(code=1008, reason='Unknown symbol')
         return
     await websocket.accept()
-    sequence = 0
-    rng = random.Random(110)
-    price = SYMBOLS[symbol]
+    queue = hub.subscribe(symbol)
     try:
         while True:
-            price = max(.01, price * (1 + rng.gauss(0, .0005)))
-            tick = snapshot(symbol, price, sequence)
-            record(symbol, tick['price'], tick['timestamp'])
+            tick = await queue.get()
+            if tick is None:
+                await websocket.close(code=1011, reason='Feed unavailable')
+                break
             await websocket.send_json(tick)
-            sequence += 1
-            await asyncio.sleep(1)
     except (WebSocketDisconnect, RuntimeError, OSError):
         return
+    finally:
+        hub.unsubscribe(symbol, queue)
 
 DIST = Path(__file__).resolve().parents[1] / 'frontend' / 'dist'
 if (DIST / 'index.html').exists():
