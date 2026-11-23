@@ -127,3 +127,17 @@ Cross-instance message distribution, persistent PostgreSQL deployment when affor
 ---
 
 **Portfolio framing:** An educational **full-stack, C++17 and distributed-systems simulation** with testable WebSocket fanout, native stateful order-book reconciliation, failure/recovery scenarios and explicitly scoped performance evidence.
+
+
+## v1.2 — Dual simulated feed normalization and source failover
+
+MarketStream now includes a per-symbol `SourceRouter` with two **fictional** vendors:
+
+- `SIM-A` supplies JSON-shaped quotes using `ticker`, `px` and `vendor_seq`.
+- `SIM-B` supplies a deliberately different schema using `instrument` (slash-delimited), `last_price` (text), and `n`.
+- Both formats are normalized and validated before the existing synthetic order-book, C++17 sequence engine and analytics stages. Source-local sequence identifiers are monotonic and duplicates or stale values are rejected per vendor.
+- When the active simulated vendor is unavailable or emits an invalid event, the router attempts the backup **once**. If both fail, the producer stops and the existing WebSocket recovery behavior applies. The router does not automatically revert to the former primary.
+- WebSocket events now include `source`, `source_sequence`, and `source_failover`; the dashboard displays these and `GET /api/stream-status` includes `source_failovers`. All counters and source states reset when the process or symbol stream restarts.
+
+`tests/test_sources.py` exercises the two schemas, mismatched symbols, bad numbers, duplicate suppression, single-step failover and metadata in a real ASGI WebSocket test. No external data connections, network source probes or production-grade failover timing are claimed. The feeds remain **synthetic** and both are driven by the same simulated reference-price generator. This demonstrates schema adaptation and failover control flow rather than actual independently collected vendor data.
+
