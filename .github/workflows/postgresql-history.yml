@@ -1,0 +1,28 @@
+name: MarketStream PostgreSQL Storage Contract
+on: [push, pull_request]
+jobs:
+  postgresql-history:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: marketstream_test
+          POSTGRES_PASSWORD: marketstream_test
+          POSTGRES_DB: marketstream_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marketstream_test -d marketstream_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MARKETSTREAM_DATABASE_URL: postgresql://marketstream_test:marketstream_test@localhost:5432/marketstream_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt pytest httpx
+      - run: python -m pytest -q tests/test_history.py
