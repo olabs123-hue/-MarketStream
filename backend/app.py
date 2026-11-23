@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from backend.processor import top_of_book
-from backend.history import record, recent
+from backend.history import record, recent, replay, backend_name
 from backend.hub import MarketHub, CapacityExceeded
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -93,6 +93,15 @@ def recorded_history(symbol: str, limit: int = Query(default=60, ge=1, le=500)):
     if symbol not in SYMBOLS:
         raise HTTPException(404, 'Unknown symbol')
     return {'symbol': symbol, 'simulated': True, 'source': 'local-observations', 'ticks': recent(symbol, limit)}
+
+
+@app.get('/api/replay/{symbol}')
+def recorded_replay(symbol: str, after_id: int = Query(default=0, ge=0),
+                    limit: int = Query(default=100, ge=1, le=500)):
+    if symbol not in SYMBOLS:
+        raise HTTPException(404, 'Unknown symbol')
+    return {'symbol': symbol, 'simulated': True, 'source': backend_name(),
+            **replay(symbol, after_id=after_id, limit=limit)}
 
 
 @app.websocket('/ws/{symbol}')
