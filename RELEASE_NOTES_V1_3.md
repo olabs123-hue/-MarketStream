@@ -1,4 +1,4 @@
-# MarketStream — Bloomberg-focused portfolio release notes (v1.3)
+# MarketStream — Technical release notes (v1.3)
 
 Date: 2026-11-23
 Commit SHA: See the successful GitHub Actions run on the repository main branch.
@@ -24,10 +24,10 @@ Commit SHA: See the successful GitHub Actions run on the repository main branch.
 
 ## Boundaries
 
-All market data and vendor schemas are simulated; no real exchange or Bloomberg interfaces exist. The project does not execute trades, produce investment decisions, replicate Bloomberg's proprietary infrastructure, or benchmark network propagation latency. Hosting remains free-tier, with ephemeral local SQLite. This is a demonstrable engineering portfolio project rather than a production market-data service.
+All market data and vendor schemas are simulated; no real exchange or Bloomberg interfaces exist. The project does not execute trades, produce investment decisions, replicate external proprietary market-data infrastructure, or benchmark network propagation latency. Hosting remains free-tier, with ephemeral local SQLite. This is a demonstrable engineering portfolio project rather than a production market-data service.
 
 ## Portfolio description
 
 **MarketStream — C++17 & Full-Stack Market Data Simulation:** Built a simulated real-time market-data terminal using C++17 stateful order-book validation, Python/FastAPI WebSockets, TypeScript/React and Docker; added sequence-aware delta reconstruction, quote normalization, microstructure analytics, bounded fanout and deterministic dual-source failover, verified by integration tests and scope-limited benchmark artifacts.
 
-A GitHub release tag and repository rename are separate repository administration actions and are not represented as completed in these notes.
+Release v1.3.0 is published and the repository is named MarketStream.
