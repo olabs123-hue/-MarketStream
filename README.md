@@ -10,7 +10,7 @@ MarketStream is a **full-stack educational simulation** of a financial market-da
 
 ## Features
 
-- Real-time WebSocket stream at one tick per second, with automatic client reconnect
+- Shared single-process WebSocket producer per symbol, with one simulated tick per second, browser reconnect, and maximum-one pending snapshot per subscriber
 - BTC-USD, ETH-USD and SOL-USD *simulated* feeds
 - Live React/TypeScript price chart, top-of-book spread, and eight synthetic depth levels on each side
 - Deterministic Python simulation helpers and independently tested REST endpoints
@@ -22,8 +22,9 @@ MarketStream is a **full-stack educational simulation** of a financial market-da
 
 ```mermaid
 flowchart LR
-  S[Python seeded simulated prices] --> API[FastAPI WebSocket /ws/:symbol]
-  API --> B[React browser dashboard]
+  S[Shared Python producer per symbol] --> API[Bounded in-memory fanout queues]
+  API --> WS[FastAPI WebSocket /ws/:symbol]
+  WS --> B[React browser dashboard]
   S --> BOOK[Synthetic L2 snapshot generation]
   BOOK --> API
   CPP[C++17 native top-of-book validation] --> API
@@ -81,12 +82,12 @@ cd frontend && npm install && npm run build
 
 ## Limitations
 
-This is a **portfolio MVP**. It has no live financial data, durable hosted persistence, Kafka integration, production-grade multi-user fanout, backpressure handling, rate limiting, order matching, trade execution or service-level guarantees. The server creates an independent synthetic random walk per connected client. The Docker WebSocket path uses the C++ top-of-book validator; local development can fall back to Python. WebSocket messages are illustrative snapshots rather than market-grade level-2 incremental updates.
+This is a **portfolio MVP**. It has no live financial data, durable hosted persistence, Kafka integration, cross-instance pub/sub, durable message replay, client rate limiting, order matching, trade execution or service-level guarantees. Each running server process now creates a shared synthetic stream for each active symbol and broadcasts its ticks through size-one per-client queues. The Docker WebSocket path uses the C++ top-of-book validator; local development can fall back to Python. WebSocket messages are illustrative snapshots rather than market-grade level-2 incremental updates.
 
 ## Future roadmap
 
 1. Extend the native C++ integration to stateful incremental order-book processing.
-2. Add bounded fanout and client backpressure policy.
+2. Add cross-instance fanout through a broker and explicit WebSocket session limits.
 3. Replace ephemeral SQLite with PostgreSQL persistence and add deterministic replay.
 4. Add benchmark evidence and failure-recovery tests.
 5. Evaluate an authorized real-market-data adapter, clearly labeled and rate-limited.
@@ -100,3 +101,13 @@ The `GET /api/recorded/{symbol}` endpoint returns up to 500 recent **generated**
 ### Validation
 
 Backend tests: `python -m pytest -q tests`. Native mode: `g++ -std=c++17 -O2 -fPIC -shared -Wall -Wextra -Werror engine/book_native.cpp -o engine/libmarketbook.so && MARKETSTREAM_REQUIRE_NATIVE=1 python -m pytest -q tests`. Docker and frontend checks are in GitHub Actions; their status must be verified separately.
+
+## Shared-stream fanout (v0.3)
+
+- The first WebSocket subscriber starts one producer for its symbol inside that Python process. Later subscribers to the same symbol receive the same generated sequence instead of creating separate random walks.
+- Each subscriber has a one-element asynchronous queue. If an older tick has not been consumed, the producer discards it and keeps the most recent tick. This bounds pending application-level queue memory; it does **not** cap networking-layer buffers or guarantee latency for indefinitely blocked sockets.
+- Generated observations are written once per producer tick into ephemeral SQLite, not once per browser connection.
+- Disconnecting the final client cancels that symbol's producer. FastAPI shutdown cancels all producers.
+- **Single-process only:** Multiple Uvicorn workers or deployed instances each run separate simulated feeds. This is not Redis/Kafka fanout, and the history is not shared between instances.
+
+Run `python -m pytest -q tests` for new shared-feed tests covering identical snapshots, one write per tick, bounded queues, invalid symbols and producer cleanup.
