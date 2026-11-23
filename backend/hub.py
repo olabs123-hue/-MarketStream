@@ -19,7 +19,7 @@ class CapacityExceeded(Exception):
 
 
 class MarketHub:
-    def __init__(self, prices: dict[str, float], make_snapshot: Callable, on_tick: Callable | None = None, interval: float = 1.0, max_clients: int = 60, max_per_symbol: int = 30, processor_factory: Callable | None = None):
+    def __init__(self, prices: dict[str, float], make_snapshot: Callable, on_tick: Callable | None = None, interval: float = 1.0, max_clients: int = 60, max_per_symbol: int = 30, processor_factory: Callable | None = None, source_factory: Callable | None = None):
         if max_clients < 1 or max_per_symbol < 1:
             raise ValueError("Subscriber limits must be positive")
         self.max_clients = max_clients
@@ -29,11 +29,13 @@ class MarketHub:
         self.on_tick = on_tick
         self.interval = interval
         self.processor_factory = processor_factory
+        self.source_factory = source_factory
         self._streams: dict[str, _Stream] = {}
         self.latest_ticks: dict[str, dict] = {}
         self.ticks_generated = 0
         self.queue_updates_dropped = 0
         self.producer_failures = 0
+        self.source_failovers = 0
 
     def subscribe(self, symbol: str) -> asyncio.Queue:
         if symbol not in self.prices:
@@ -80,6 +82,7 @@ class MarketHub:
             "ticks_generated": self.ticks_generated,
             "queue_updates_dropped": self.queue_updates_dropped,
             "producer_failures": self.producer_failures,
+            "source_failovers": self.source_failovers,
         }
 
     def publish(self, symbol: str, tick: dict) -> None:
@@ -97,12 +100,22 @@ class MarketHub:
         price = self.prices[symbol]
         sequence = 0
         processor = None
+        source_router = None
         try:
+            if self.source_factory is not None:
+                source_router = self.source_factory(symbol)
             if self.processor_factory is not None:
                 processor = self.processor_factory(symbol)
             while stream.subscribers and self._streams.get(symbol) is stream:
                 price = max(0.01, price * (1 + rng.gauss(0, 0.0005)))
-                tick = self.make_snapshot(symbol, price, sequence)
+                vendor = source_router.next(price) if source_router is not None else None
+                tick = self.make_snapshot(symbol, vendor.price if vendor else price, sequence)
+                if vendor is not None:
+                    tick.update({"source": vendor.source,
+                                 "source_sequence": vendor.source_sequence,
+                                 "source_failover": vendor.failover})
+                    if vendor.failover:
+                        self.source_failovers += 1
                 if processor is not None:
                     # Periodic full-book snapshots bound recovery time in the
                     # synthetic feed; intermediate ticks are L2 delta events.
@@ -125,6 +138,8 @@ class MarketHub:
             # the producer; the error is intentionally visible in diagnostics.
             self.producer_failures += 1
         finally:
+            if source_router is not None:
+                source_router.close()
             if processor is not None:
                 processor.close()
             # A failed producer must not leave hanging subscribers indefinitely.
