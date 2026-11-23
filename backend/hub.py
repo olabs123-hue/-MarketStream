@@ -29,6 +29,9 @@ class MarketHub:
         self.on_tick = on_tick
         self.interval = interval
         self._streams: dict[str, _Stream] = {}
+        self.ticks_generated = 0
+        self.queue_updates_dropped = 0
+        self.producer_failures = 0
 
     def subscribe(self, symbol: str) -> asyncio.Queue:
         if symbol not in self.prices:
@@ -70,6 +73,9 @@ class MarketHub:
             "active_symbols": len(self._streams),
             "max_subscribers": self.max_clients,
             "max_per_symbol": self.max_per_symbol,
+            "ticks_generated": self.ticks_generated,
+            "queue_updates_dropped": self.queue_updates_dropped,
+            "producer_failures": self.producer_failures,
         }
 
     def publish(self, symbol: str, tick: dict) -> None:
@@ -79,6 +85,7 @@ class MarketHub:
         for queue in tuple(stream.subscribers):
             if queue.full():
                 queue.get_nowait()  # keep the newest snapshot for a slow consumer
+                self.queue_updates_dropped += 1
             queue.put_nowait(tick)
 
     async def _produce(self, symbol: str, stream: _Stream) -> None:
@@ -93,10 +100,15 @@ class MarketHub:
                     # Persist only one observation per generated tick, not one per client.
                     await asyncio.to_thread(self.on_tick, symbol, tick)
                 self.publish(symbol, tick)
+                self.ticks_generated += 1
                 sequence += 1
                 await asyncio.sleep(self.interval)
         except asyncio.CancelledError:
             raise
+        except Exception:
+            # Record the fault and notify clients. A new subscriber can restart
+            # the producer; the error is intentionally visible in diagnostics.
+            self.producer_failures += 1
         finally:
             # A failed producer must not leave hanging subscribers indefinitely.
             if self._streams.get(symbol) is stream:
