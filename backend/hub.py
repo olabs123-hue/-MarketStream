@@ -101,7 +101,12 @@ class MarketHub:
                 price = max(0.01, price * (1 + rng.gauss(0, 0.0005)))
                 tick = self.make_snapshot(symbol, price, sequence)
                 if processor is not None:
-                    tick = processor.apply(tick)
+                    # Periodic full-book snapshots bound recovery time in the
+                    # synthetic feed; intermediate ticks are L2 delta events.
+                    event = (processor.make_delta(tick)
+                             if sequence % 30 != 0 and hasattr(processor, "make_delta")
+                             else tick)
+                    tick = processor.apply(event)
                 if self.on_tick is not None:
                     # Persist only one observation per generated tick, not one per client.
                     await asyncio.to_thread(self.on_tick, symbol, tick)
