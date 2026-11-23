@@ -2,7 +2,7 @@
 
 **Full-stack simulated market-data terminal | React · TypeScript · FastAPI · WebSockets · C++17 · SQLite / optional PostgreSQL · Docker**
 
-[Live demonstration](https://marketstream-sim-olabs123.onrender.com) · [CI workflows](https://github.com/olabs123-hue/-MarketStream/actions) · [In-process benchmark](https://github.com/olabs123-hue/-MarketStream/actions/runs/45190849808)
+[Live demonstration](https://marketstream-sim-olabs123.onrender.com) · [CI workflows](https://github.com/olabs123-hue/MarketStream/actions) · [In-process benchmark](https://github.com/olabs123-hue/MarketStream/actions/runs/45190849808)
 
 MarketStream is an educational real-time systems project. It produces **fictional BTC-USD, ETH-USD and SOL-USD prices**, synthesizes order-book depth, validates order-book state through a native C++17 engine, and displays the results in a responsive React dashboard. **It is not a trading platform, is not connected to an exchange, and provides no financial advice.**
 
@@ -94,7 +94,7 @@ The v1.0 correctness stress scenario applies **500 generated snapshots/deltas** 
 
 ### Measured benchmark evidence (not live throughput)
 
-A [GitHub Actions benchmark run](https://github.com/olabs123-hue/-MarketStream/actions/runs/45190849808) on 23 November 2026 reported **138,388.83 calls/s** and **p95 7.493 µs** for `MarketHub.publish()` with **20 in-process subscriber queues**, **1,000 warm-up publishes** and **10,000 measured publishes** on a Python 3.12.16 Linux runner. This measures Python enqueue time only, **not** end-to-end WebSocket latency, confirmed consumer deliveries, database throughput or C++ matching performance. Its size-one queues discarded stale observations; these numbers must not be presented as real-time trading or exchange-processing performance. Rerun `python -m scripts.benchmark_fanout --subscribers 20 --ticks 10000 --warmup 1000` to obtain machine-specific results.
+A [GitHub Actions benchmark run](https://github.com/olabs123-hue/MarketStream/actions/runs/45190849808) on 23 November 2026 reported **138,388.83 calls/s** and **p95 7.493 µs** for `MarketHub.publish()` with **20 in-process subscriber queues**, **1,000 warm-up publishes** and **10,000 measured publishes** on a Python 3.12.16 Linux runner. This measures Python enqueue time only, **not** end-to-end WebSocket latency, confirmed consumer deliveries, database throughput or C++ matching performance. Its size-one queues discarded stale observations; these numbers must not be presented as real-time trading or exchange-processing performance. Rerun `python -m scripts.benchmark_fanout --subscribers 20 --ticks 10000 --warmup 1000` to obtain machine-specific results.
 
 The independent C++ benchmark is in `benchmarks/level_book_bench.cpp`; its results are not equivalent to the Python fanout measurement.
 
@@ -169,6 +169,6 @@ MarketStream remains a **portfolio-grade educational simulation**. The live Rend
 
 ### Verified v1.3 fault-injection evidence
 
-The [controlled failover workflow run](https://github.com/olabs123-hue/-MarketStream/actions/runs/45196355759) on 23 November 2026 reported **200 / 200 successful simulated source switches**, with **p95 2.964 microseconds** for the synchronous in-memory failover selection; the sample window was the last 256 measurements on a GitHub-hosted Python 3.12.16 Linux runner. Source-read + normalization p95 was **2.414 microseconds** over the last 256 events. These figures **exclude all network activity**, C++ processing, database writes and WebSocket delivery. They are not Bloomberg performance metrics, external vendor recovery time or an exchange latency claim.
+The [controlled failover workflow run](https://github.com/olabs123-hue/MarketStream/actions/runs/45196355759) on 23 November 2026 reported **200 / 200 successful simulated source switches**, with **p95 2.964 microseconds** for the synchronous in-memory failover selection; the sample window was the last 256 measurements on a GitHub-hosted Python 3.12.16 Linux runner. Source-read + normalization p95 was **2.414 microseconds** over the last 256 events. These figures **exclude all network activity**, C++ processing, database writes and WebSocket delivery. They are not Bloomberg performance metrics, external vendor recovery time or an exchange latency claim.
 
 The verified test scenario is reproducible through `python -m scripts.benchmark_failover --events 2000 --fail-every 10`. Download the workflow's `controlled-failover-evidence` artifact for exact measurements and run metadata.
