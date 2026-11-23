@@ -30,6 +30,7 @@ class MarketHub:
         self.interval = interval
         self.processor_factory = processor_factory
         self._streams: dict[str, _Stream] = {}
+        self.latest_ticks: dict[str, dict] = {}
         self.ticks_generated = 0
         self.queue_updates_dropped = 0
         self.producer_failures = 0
@@ -56,6 +57,7 @@ class MarketHub:
             return
         stream.subscribers.discard(queue)
         if not stream.subscribers:
+            self.latest_ticks.pop(symbol, None)
             self._streams.pop(symbol, None)
             if stream.task:
                 stream.task.cancel()
@@ -63,6 +65,7 @@ class MarketHub:
     async def close(self) -> None:
         tasks = [s.task for s in self._streams.values() if s.task]
         self._streams.clear()
+        self.latest_ticks.clear()
         for task in tasks:
             task.cancel()
         if tasks:
@@ -110,6 +113,7 @@ class MarketHub:
                 if self.on_tick is not None:
                     # Persist only one observation per generated tick, not one per client.
                     await asyncio.to_thread(self.on_tick, symbol, tick)
+                self.latest_ticks[symbol] = tick
                 self.publish(symbol, tick)
                 self.ticks_generated += 1
                 sequence += 1
@@ -125,6 +129,7 @@ class MarketHub:
                 processor.close()
             # A failed producer must not leave hanging subscribers indefinitely.
             if self._streams.get(symbol) is stream:
+                self.latest_ticks.pop(symbol, None)
                 self._streams.pop(symbol, None)
                 for queue in tuple(stream.subscribers):
                     if queue.full():
