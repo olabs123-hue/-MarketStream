@@ -143,3 +143,16 @@ All monitoring remains anonymous aggregate instrumentation for fictional market 
 - **CI integration:** `.github/workflows/postgresql-history.yml` launches a temporary PostgreSQL 16 instance on GitHub Actions and runs the storage/replay contract tests. It does not create any cloud database or paid resource.
 
 This version does **not** provide cross-instance fanout, historical order-book reconstruction, exactly-once processing, or persistent Render storage unless a PostgreSQL service is explicitly configured. Existing simulated WebSocket endpoints and React chart remain unchanged.
+
+
+## v0.6 repeatable performance evidence
+
+This release adds `scripts/benchmark_fanout.py` with repeatable warm-up, per-`publish()` wall-clock timing, nearest-rank p50/p95/p99 latency, queue-shedding count, Python version, and execution platform. The `.github/workflows/benchmark.yml` CI workflow runs the benchmark (20 subscribers; 10,000 measured publishes, 1,000 warm-up publishes) and attaches a **JSON artifact** to each GitHub Actions run. Run it locally:
+
+```bash
+python -m scripts.benchmark_fanout --subscribers 20 --ticks 10000 --warmup 1000 --output fanout-benchmark.json
+```
+
+**Scope:** Python in-process delivery to `asyncio.Queue(maxsize=1)` only. It excludes WebSocket serialization/network transmission, database recording, native C++ processing, exchange ingestion, and end-to-end response latency. The offered updates can replace previous updates in each subscriber's size-one queue; `attempted_queue_deliveries` is not confirmed consumer delivery. Compare results only with the same workload and environment; do not market these figures as financial trading latency.
+
+Additional tests validate the benchmark's reporting consistency and use multiple ASGI WebSocket clients to exercise the shared per-symbol producer. Restart and injected-failure recovery tests from v0.4.1 remain part of the backend test suite. No production load testing against the live free Render service is performed.
