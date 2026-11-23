@@ -6,7 +6,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+from backend.processor import top_of_book
+from backend.history import record, recent
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -26,9 +28,10 @@ def snapshot(symbol: str, price: float, sequence: int, *, seed: int = 73) -> dic
     best_ask = price + spread / 2
     bids = [[round(best_bid - i * tick, 2), round(rng.uniform(.15, 6), 3)] for i in range(8)]
     asks = [[round(best_ask + i * tick, 2), round(rng.uniform(.15, 6), 3)] for i in range(8)]
+    calculated = top_of_book(bids, asks)
     return {'symbol': symbol, 'sequence': sequence, 'timestamp': datetime.now(timezone.utc).isoformat(),
             'price': round(price, 2), 'change_pct': round((price / SYMBOLS[symbol] - 1) * 100, 3),
-            'bids': bids, 'asks': asks, 'spread': round(asks[0][0] - bids[0][0], 2), 'simulated': True}
+            'bids': bids, 'asks': asks, 'spread': calculated['spread'], 'processor': calculated['processor'], 'simulated': True}
 
 
 def generate_path(symbol: str, count: int = 36, seed: int = 21) -> list[float]:
@@ -68,6 +71,13 @@ def history(symbol: str):
     return {'symbol': symbol, 'simulated': True, 'prices': generate_path(symbol)}
 
 
+@app.get('/api/recorded/{symbol}')
+def recorded_history(symbol: str, limit: int = Query(default=60, ge=1, le=500)):
+    if symbol not in SYMBOLS:
+        raise HTTPException(404, 'Unknown symbol')
+    return {'symbol': symbol, 'simulated': True, 'source': 'local-observations', 'ticks': recent(symbol, limit)}
+
+
 @app.websocket('/ws/{symbol}')
 async def market_stream(websocket: WebSocket, symbol: str):
     if symbol not in SYMBOLS:
@@ -80,7 +90,9 @@ async def market_stream(websocket: WebSocket, symbol: str):
     try:
         while True:
             price = max(.01, price * (1 + rng.gauss(0, .0005)))
-            await websocket.send_json(snapshot(symbol, price, sequence))
+            tick = snapshot(symbol, price, sequence)
+            record(symbol, tick['price'], tick['timestamp'])
+            await websocket.send_json(tick)
             sequence += 1
             await asyncio.sleep(1)
     except (WebSocketDisconnect, RuntimeError, OSError):
