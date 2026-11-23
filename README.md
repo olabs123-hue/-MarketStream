@@ -186,3 +186,16 @@ The *simulated* WebSocket producer now allocates an independent native C++17 boo
 The Python adapter `backend/stateful.py` verifies native best bid, best ask, spread, and level counts against the generated snapshot before broadcasting, and publishes `processor: "cpp17-stateful"`, `book_levels`, `level_updates`, and `book_mode: "snapshot-delta-reconciliation"` in WebSocket messages. Locally, a labeled Python reference fallback is used if the shared library is absent. Render requires the native library.
 
 The native book lifetime is tied to the in-process symbol producer: when all subscribers disconnect or a producer fails, the book is closed; reconnecting starts a new simulated session at sequence zero. This is **full-snapshot-to-level-delta reconciliation**, not an exchange incremental feed decoder, an order-matching engine, or persistent order-book replay. Real exchange data and trading are not supported. Backend and native CI run the stateful book consistency tests.
+
+
+## v0.9 — Sequence-aware simulated incremental depth
+
+The simulated producer now generates **full synthetic snapshots at sequence 0 and every 30th tick**, and otherwise derives **absolute-quantity L2 price-level delta events** from successive snapshots. `backend/sequencing.py` validates monotonically increasing sequences and reconstructs a full book for the existing React dashboard. The C++17 stateful book remains responsible for accepting or rejecting the resulting book and reconciling price levels. WebSocket messages include `event_type` (`snapshot` or `delta`), `resynchronized`, and `sequence_gaps_detected`.
+
+- Duplicate or out-of-order updates are rejected, with no accepted-book mutation.
+- A missing delta marks the stream as requiring a fresh full snapshot. Further deltas are rejected until the snapshot restores consistency.
+- A valid newer full snapshot can resynchronize the stream, and accepted snapshots are validated against native best bid, ask, spread and depth counts.
+- Snapshot-to-delta and recovery cases are covered in `tests/test_sequencing.py`, including native-library mode on GitHub Actions.
+- The browser receives a **complete reconstructed book on every message**, even when the internal event is a delta, to preserve its chart and depth-table interface.
+
+This is an educational synthetic protocol, **not** an exchange-native feed adapter. The current live producer generates consecutive events and does not intentionally inject packet loss; recovery behavior is exercised through tests. There is no cross-instance replay, exchange sequence numbering, real trading or production reliability guarantee.
