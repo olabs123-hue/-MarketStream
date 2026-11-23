@@ -4,6 +4,7 @@ This is an in-process demo fanout, not a cross-instance message broker.
 """
 import asyncio
 import random
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -36,6 +37,9 @@ class MarketHub:
         self.queue_updates_dropped = 0
         self.producer_failures = 0
         self.source_failovers = 0
+        self.source_failed_attempts = 0
+        self.source_processing_samples_us = deque(maxlen=512)
+        self.source_failover_samples_us = deque(maxlen=512)
 
     def subscribe(self, symbol: str) -> asyncio.Queue:
         if symbol not in self.prices:
@@ -73,6 +77,13 @@ class MarketHub:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
+    @staticmethod
+    def _p95(values) -> float | None:
+        if not values:
+            return None
+        ordered = sorted(values)
+        return round(ordered[max(0, int((len(ordered) - 1) * .95 + .5))], 3)
+
     def connection_stats(self) -> dict:
         return {
             "connected_subscribers": sum(len(s.subscribers) for s in self._streams.values()),
@@ -83,6 +94,10 @@ class MarketHub:
             "queue_updates_dropped": self.queue_updates_dropped,
             "producer_failures": self.producer_failures,
             "source_failovers": self.source_failovers,
+            "source_failed_attempts": self.source_failed_attempts,
+            "source_latency_p95_us": self._p95(self.source_processing_samples_us),
+            "source_failover_p95_us": self._p95(self.source_failover_samples_us),
+            "source_latency_sample_count": len(self.source_processing_samples_us),
         }
 
     def publish(self, symbol: str, tick: dict) -> None:
@@ -114,8 +129,14 @@ class MarketHub:
                     tick.update({"source": vendor.source,
                                  "source_sequence": vendor.source_sequence,
                                  "source_failover": vendor.failover})
+                    self.source_processing_samples_us.append(vendor.processing_us)
+                    self.source_failed_attempts += vendor.attempts - 1
+                    tick["source_processing_us"] = vendor.processing_us
+                    tick["source_attempts"] = vendor.attempts
+                    tick["source_failover_us"] = vendor.failover_us
                     if vendor.failover:
                         self.source_failovers += 1
+                        self.source_failover_samples_us.append(vendor.failover_us)
                 if processor is not None:
                     # Periodic full-book snapshots bound recovery time in the
                     # synthetic feed; intermediate ticks are L2 delta events.
