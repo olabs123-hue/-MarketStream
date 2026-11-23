@@ -1,0 +1,23 @@
+name: MarketStream Controlled Failover Evidence
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  source-failover:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fault injection and bounded local timing
+        run: |
+          python -m scripts.benchmark_failover --events 2000 --fail-every 10 --output failover-evidence.json
+      - name: Record the source commit and CI run
+        run: |
+          python -c "import json,os; p='failover-evidence.json'; x=json.load(open(p)); x['git_commit']=os.getenv('GITHUB_SHA'); x['github_run_id']=os.getenv('GITHUB_RUN_ID'); open(p,'w').write(json.dumps(x,indent=2)+'\n')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: controlled-failover-evidence
+          path: failover-evidence.json
+          retention-days: 30
