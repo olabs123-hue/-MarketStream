@@ -141,3 +141,27 @@ MarketStream now includes a per-symbol `SourceRouter` with two **fictional** ven
 
 `tests/test_sources.py` exercises the two schemas, mismatched symbols, bad numbers, duplicate suppression, single-step failover and metadata in a real ASGI WebSocket test. No external data connections, network source probes or production-grade failover timing are claimed. The feeds remain **synthetic** and both are driven by the same simulated reference-price generator. This demonstrates schema adaptation and failover control flow rather than actual independently collected vendor data.
 
+
+
+## v1.3 — Reliability, local source latency, and controlled fault injection
+
+The synthetic SIM-A/SIM-B ingestion layer now measures the elapsed time spent **reading an in-memory fictional vendor object, normalizing its payload and selecting the active source** with `perf_counter_ns`. It exposes:
+
+- Per-stream tick metadata `source_processing_us`, `source_attempts`, and `source_failover_us` (null when no switch occurred).
+- `GET /api/stream-status` process-local cumulative `source_failovers`, `source_failed_attempts`, and bounded `source_latency_p95_us`, `source_failover_p95_us`, `source_latency_sample_count`. Percentiles are nearest-rank estimates from at most 512 observations (not long-term SLO metrics).
+- Bounded `SourceRouter` samples of at most 256 source reads and 256 switches per producer, to avoid unbounded instrumentation growth.
+- The React terminal displays current local source processing cost and, when applicable, the in-process failover cost.
+
+### Controlled recovery test / benchmark
+
+```bash
+python -m scripts.benchmark_failover --events 2000 --fail-every 10 --output failover-evidence.json
+```
+
+This deterministic offline scenario repeatedly marks the **currently active fictional source** as failed, then verifies that the local backup is selected, and checks the number of successful failovers. It records p50/p95/p99 timings and machine metadata. GitHub Actions runs the scenario in `.github/workflows/failover-benchmark.yml` and preserves JSON evidence in an artifact. Regression tests cover rejection, two-source outage, bounded samples, live WebSocket metadata, and API metrics. **These are local synchronous Python timings only**; there are **no network outages, Bloomberg/exchange feeds, WebSocket round trips or end-to-end recovery SLAs**. The production demo never intentionally triggers a vendor fault.
+
+### Final verification and scope
+
+GitHub Actions must pass backend, native C++ integration, frontend, standalone C++, Docker, PostgreSQL storage-contract, fanout benchmark, and fault-injection benchmark checks before deployment. Passing a test does not imply security accreditation or production-level robustness.
+
+MarketStream remains a **portfolio-grade educational simulation**. The live Render free service uses ephemeral SQLite by default; optional hosted PostgreSQL is not provisioned. Its simulated vendor data is generated from a shared reference-price process, not independently sampled markets.
