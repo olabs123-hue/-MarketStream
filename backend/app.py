@@ -1,5 +1,7 @@
 """Simulated streaming market data API. No real market data or investment functions."""
 import math
+import os
+import asyncio
 import random
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -8,7 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from backend.processor import top_of_book
 from backend.history import record, recent
-from backend.hub import MarketHub
+from backend.hub import MarketHub, CapacityExceeded
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -50,7 +52,7 @@ def persist_tick(symbol: str, tick: dict) -> None:
     record(symbol, tick['price'], tick['timestamp'])
 
 
-hub = MarketHub(SYMBOLS, snapshot, persist_tick)
+hub = MarketHub(SYMBOLS, snapshot, persist_tick, max_clients=max(1, int(os.getenv('MARKETSTREAM_MAX_CLIENTS', '60'))), max_per_symbol=max(1, int(os.getenv('MARKETSTREAM_MAX_PER_SYMBOL', '30'))))
 
 
 @asynccontextmanager
@@ -66,6 +68,11 @@ app = FastAPI(title='MarketStream', version='0.1.0', lifespan=lifespan)
 @app.get('/health')
 def health():
     return {'status': 'ok', 'mode': 'simulation'}
+
+
+@app.get('/api/stream-status')
+def stream_status():
+    return {'mode': 'simulation', **hub.connection_stats()}
 
 
 @app.get('/api/markets')
@@ -93,16 +100,21 @@ async def market_stream(websocket: WebSocket, symbol: str):
     if symbol not in SYMBOLS:
         await websocket.close(code=1008, reason='Unknown symbol')
         return
-    await websocket.accept()
-    queue = hub.subscribe(symbol)
     try:
+        queue = hub.subscribe(symbol)
+    except CapacityExceeded:
+        await websocket.close(code=1013, reason='Stream capacity reached')
+        return
+    try:
+        await websocket.accept()
         while True:
             tick = await queue.get()
             if tick is None:
                 await websocket.close(code=1011, reason='Feed unavailable')
                 break
-            await websocket.send_json(tick)
-    except (WebSocketDisconnect, RuntimeError, OSError):
+            # A stalled client must not block a handler forever.
+            await asyncio.wait_for(websocket.send_json(tick), timeout=5.0)
+    except (WebSocketDisconnect, RuntimeError, OSError, asyncio.TimeoutError):
         return
     finally:
         hub.unsubscribe(symbol, queue)
