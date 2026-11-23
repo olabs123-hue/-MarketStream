@@ -4,6 +4,8 @@ Both feeds derive *synthetic* quotes from the caller's generated reference price
 There are no network calls, exchange connections or external data vendors.
 """
 import math
+import time
+from collections import deque
 from dataclasses import dataclass
 
 class FeedUnavailable(RuntimeError):
@@ -19,6 +21,9 @@ class NormalizedQuote:
     source: str
     source_sequence: int
     failover: bool
+    processing_us: float = 0.0
+    failover_us: float | None = None
+    attempts: int = 1
 
 class SimulatedVendor:
     def __init__(self, name: str):
@@ -74,6 +79,9 @@ class SourceRouter:
         self.last_seen = {}
         self.failovers = 0
         self.duplicates_rejected = 0
+        self.failed_attempts = 0
+        self.processing_samples_us = deque(maxlen=256)
+        self.failover_samples_us = deque(maxlen=256)
 
     def _accept(self, source, raw):
         price, sequence = normalize(source.name, raw, self.symbol)
@@ -85,20 +93,36 @@ class SourceRouter:
         return price, sequence
 
     def next(self, reference_price: float) -> NormalizedQuote:
-        # A bad primary quote triggers one backup attempt; never loop forever.
+        """Read at most two in-process synthetic sources; measure synchronous cost.
+
+        Measurements include local Python read + normalization + selection, but
+        exclude simulated tick generation, C++, persistence, network and sockets.
+        """
+        started = time.perf_counter_ns()
+        failures = 0
         for index in (self.active, 1 - self.active):
             source = self.sources[index]
             try:
                 price, sequence = self._accept(
                     source, source.read(self.symbol, reference_price))
             except (FeedUnavailable, InvalidVendorEvent):
+                self.failed_attempts += 1
+                failures += 1
                 continue
             switched = index != self.active
             if switched:
                 self.failovers += 1
                 self.active = index
+            elapsed = max(0.0, (time.perf_counter_ns() - started) / 1000)
+            self.processing_samples_us.append(elapsed)
+            failover_us = elapsed if switched else None
+            if failover_us is not None:
+                self.failover_samples_us.append(failover_us)
             return NormalizedQuote(self.symbol, price, source.name,
-                                   sequence, switched)
+                                   sequence, switched,
+                                   processing_us=round(elapsed, 3),
+                                   failover_us=round(failover_us, 3) if failover_us is not None else None,
+                                   attempts=failures + 1)
         raise FeedUnavailable("Both simulated sources unavailable or invalid")
 
     def close(self):
