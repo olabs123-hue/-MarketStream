@@ -8,10 +8,11 @@ RUN npm run build
 FROM gcc:14 AS native
 WORKDIR /app
 COPY engine/book_native.cpp engine/book_native.cpp
+COPY engine/book_stateful.cpp engine/book_stateful.cpp
 COPY engine/level_book.hpp engine/level_book.hpp
 COPY tests/level_book_test.cpp tests/level_book_test.cpp
 RUN g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic tests/level_book_test.cpp -o /tmp/level-book-test && /tmp/level-book-test
-RUN g++ -std=c++17 -O2 -fPIC -shared -Wall -Wextra -Werror engine/book_native.cpp -o /app/engine/libmarketbook.so
+RUN g++ -std=c++17 -O2 -fPIC -shared -Wall -Wextra -Werror engine/book_native.cpp engine/book_stateful.cpp -o /app/engine/libmarketbook.so
 
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
