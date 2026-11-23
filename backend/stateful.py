@@ -20,7 +20,8 @@ def encode(levels: list[list[float]]) -> dict[int, int]:
             raise ValueError("Non-finite level")
         price, quantity = (int(round(float(level[0]) * 100)),
                            int(round(float(level[1]) * 1000)))
-        if price <= 0 or quantity <= 0 or price in result:
+        if (price <= 0 or quantity <= 0 or price > 9223372036854775807
+                or quantity > 9223372036854775807 or price in result):
             raise ValueError("Invalid or duplicate price level")
         result[price] = quantity
     return result
