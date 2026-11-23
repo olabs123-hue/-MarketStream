@@ -19,7 +19,7 @@ class CapacityExceeded(Exception):
 
 
 class MarketHub:
-    def __init__(self, prices: dict[str, float], make_snapshot: Callable, on_tick: Callable | None = None, interval: float = 1.0, max_clients: int = 60, max_per_symbol: int = 30):
+    def __init__(self, prices: dict[str, float], make_snapshot: Callable, on_tick: Callable | None = None, interval: float = 1.0, max_clients: int = 60, max_per_symbol: int = 30, processor_factory: Callable | None = None):
         if max_clients < 1 or max_per_symbol < 1:
             raise ValueError("Subscriber limits must be positive")
         self.max_clients = max_clients
@@ -28,6 +28,7 @@ class MarketHub:
         self.make_snapshot = make_snapshot
         self.on_tick = on_tick
         self.interval = interval
+        self.processor_factory = processor_factory
         self._streams: dict[str, _Stream] = {}
         self.ticks_generated = 0
         self.queue_updates_dropped = 0
@@ -92,10 +93,15 @@ class MarketHub:
         rng = random.Random(f"marketstream:{symbol}")
         price = self.prices[symbol]
         sequence = 0
+        processor = None
         try:
+            if self.processor_factory is not None:
+                processor = self.processor_factory(symbol)
             while stream.subscribers and self._streams.get(symbol) is stream:
                 price = max(0.01, price * (1 + rng.gauss(0, 0.0005)))
                 tick = self.make_snapshot(symbol, price, sequence)
+                if processor is not None:
+                    tick = processor.apply(tick)
                 if self.on_tick is not None:
                     # Persist only one observation per generated tick, not one per client.
                     await asyncio.to_thread(self.on_tick, symbol, tick)
@@ -110,6 +116,8 @@ class MarketHub:
             # the producer; the error is intentionally visible in diagnostics.
             self.producer_failures += 1
         finally:
+            if processor is not None:
+                processor.close()
             # A failed producer must not leave hanging subscribers indefinitely.
             if self._streams.get(symbol) is stream:
                 self._streams.pop(symbol, None)
