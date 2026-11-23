@@ -14,6 +14,7 @@ from backend.hub import MarketHub, CapacityExceeded
 from backend.stateful import StatefulBook
 from backend.sequencing import SequencedBook
 from backend.analytics import AnalyticsBook
+from backend.sources import SourceRouter
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -55,7 +56,7 @@ def persist_tick(symbol: str, tick: dict) -> None:
     record(symbol, tick['price'], tick['timestamp'])
 
 
-hub = MarketHub(SYMBOLS, snapshot, persist_tick, max_clients=max(1, int(os.getenv('MARKETSTREAM_MAX_CLIENTS', '60'))), max_per_symbol=max(1, int(os.getenv('MARKETSTREAM_MAX_PER_SYMBOL', '30'))), processor_factory=lambda symbol: AnalyticsBook(SequencedBook(StatefulBook())))
+hub = MarketHub(SYMBOLS, snapshot, persist_tick, max_clients=max(1, int(os.getenv('MARKETSTREAM_MAX_CLIENTS', '60'))), max_per_symbol=max(1, int(os.getenv('MARKETSTREAM_MAX_PER_SYMBOL', '30'))), processor_factory=lambda symbol: AnalyticsBook(SequencedBook(StatefulBook())), source_factory=lambda symbol: SourceRouter(symbol))
 
 
 @asynccontextmanager
@@ -65,7 +66,7 @@ async def lifespan(app: FastAPI):
     finally:
         await hub.close()
 
-app = FastAPI(title='MarketStream', version='1.1.0', lifespan=lifespan)
+app = FastAPI(title='MarketStream', version='1.2.0', lifespan=lifespan)
 
 
 @app.get('/health')
