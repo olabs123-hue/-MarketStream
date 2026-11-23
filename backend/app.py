@@ -6,6 +6,7 @@ import random
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
 from backend.processor import top_of_book
@@ -121,8 +122,40 @@ def recorded_replay(symbol: str, after_id: int = Query(default=0, ge=0),
             **replay(symbol, after_id=after_id, limit=limit)}
 
 
+def allowed_websocket_origin(websocket: WebSocket) -> bool:
+    """Reject browser cross-origin subscriptions unless explicitly allowed.
+
+    Native WS clients may omit Origin, so this is not authentication.
+    """
+    origin = websocket.headers.get('origin')
+    if not origin:
+        return True
+    try:
+        parsed = urlsplit(origin)
+        if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+            return False
+        # Origins have no URL paths; compare against the requested host.
+        if parsed.path not in ('', '/') or parsed.username or parsed.password:
+            return False
+        incoming_host = websocket.headers.get('host', '')
+        if parsed.netloc.lower() == incoming_host.lower():
+            return True
+        extras = {s.strip() for s in os.getenv('MARKETSTREAM_ALLOWED_WS_ORIGINS', '').split(',') if s.strip()}
+        if origin in extras:
+            return True
+        # Allow an explicitly local Vite development origin for local backends.
+        return (incoming_host.lower() in ('localhost:8000', '127.0.0.1:8000')
+                and parsed.hostname in ('localhost', '127.0.0.1')
+                and parsed.port == 5173)
+    except (ValueError, TypeError):
+        return False
+
+
 @app.websocket('/ws/{symbol}')
 async def market_stream(websocket: WebSocket, symbol: str):
+    if not allowed_websocket_origin(websocket):
+        await websocket.close(code=1008, reason='Origin not allowed')
+        return
     if symbol not in SYMBOLS:
         await websocket.close(code=1008, reason='Unknown symbol')
         return
