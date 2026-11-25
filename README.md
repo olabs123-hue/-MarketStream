@@ -6,6 +6,17 @@
 
 MarketStream is an educational real-time systems project. It produces **fictional BTC-USD, ETH-USD and SOL-USD prices**, synthesizes order-book depth, validates order-book state through a native C++17 engine, and displays the results in a responsive React dashboard. **It is not a trading platform, is not connected to an exchange, and provides no financial advice.**
 
+## Verified measurement snapshot
+
+| Experiment | Measured result |
+| --- | --- |
+| Python in-process fanout enqueue (20 subscriber queues, 10,000 measured publishes) | **138,388.83 calls/s**, p95 **7.493 µs** |
+| Synthetic in-memory source failover | **200/200 successful switches**, p95 **2.964 µs** for local selection |
+
+Evidence: [fanout CI benchmark](https://github.com/olabs123-hue/MarketStream/actions/runs/45190849808) · [synthetic failover CI benchmark](https://github.com/olabs123-hue/MarketStream/actions/runs/45196355759).
+
+**Scope:** the fanout result measures Python enqueue operations, not C++ throughput, client WebSocket deliveries or end-to-end latency. The simulated failover figure excludes network activity and external vendors.
+
 ## Architecture
 
 ```mermaid
