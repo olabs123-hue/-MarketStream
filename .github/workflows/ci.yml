@@ -51,6 +51,10 @@ jobs:
         run: |
           g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic tests/level_book_test.cpp -o /tmp/marketstream-level-book
           /tmp/marketstream-level-book
+      - name: Compile and test isolated native sequence guard
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic tests/sequence_guard_native_test.cpp -o /tmp/marketstream-sequence-test
+          /tmp/marketstream-sequence-test
       - name: Compile native update benchmark
         run: |
           g++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic benchmarks/level_book_bench.cpp -o /tmp/marketstream-book-bench
