@@ -24,7 +24,7 @@ Commit SHA: See the successful GitHub Actions run on the repository main branch.
 
 ## Boundaries
 
-All market data and vendor schemas are simulated; no real exchange or Bloomberg interfaces exist. The project does not execute trades, produce investment decisions, replicate external proprietary market-data infrastructure, or benchmark network propagation latency. Hosting remains free-tier, with ephemeral local SQLite. This is a demonstrable engineering portfolio project rather than a production market-data service.
+All market data and vendor schemas are simulated; no real exchange or external vendor interfaces exist. The project does not execute trades, produce investment decisions, replicate external proprietary market-data infrastructure, or benchmark network propagation latency. Hosting remains free-tier, with ephemeral local SQLite. This is a demonstrable engineering portfolio project rather than a production market-data service.
 
 ## Portfolio description
 
