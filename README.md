@@ -137,10 +137,7 @@ A standalone C++17 `SequenceGuard` now lives in
 [`engine/sequence_guard.hpp`](engine/sequence_guard.hpp), with a
 [regression test](tests/sequence_guard_native_test.cpp) covering duplicate
 rejection, gaps, snapshot-based resynchronization, and commit-after-book
-state updates. The CI workflow is configured to compile and execute this
-test. **The Python `SequencedBook` is still the active application path**;
-the native guard is not yet integrated into the live stream, and a passing
-CI result for the new test has not yet been checked.
+state updates. The CI workflow compiles and executes this test: [MarketStream CI run 45631917300](https://github.com/olabs123-hue/MarketStream/actions/runs/45631917300) reports success for the **isolated native sequence guard** step, alongside the backend, native-integration, frontend, C++ and Docker steps. **The Python `SequencedBook` is still the active application path**; the native guard is not yet integrated into the live stream.
 
 Integration, Python/native parity testing, native fanout, and measured
 p50/p95/p99 C++ update latency are remaining tasks. Do not describe them
