@@ -131,6 +131,21 @@ This extension models the **data-validation and quote-analytics work** useful in
 
 Formula conventions: `spread_bps = 10000 × (best_ask − best_bid) / midpoint`; `imbalance = (sum_bid_size − sum_ask_size)/(sum_bid_size + sum_ask_size)`; `microprice = (best_ask × best_bid_size + best_bid × best_ask_size)/(best_bid_size + best_ask_size)`.
 
+## Native sequencing migration — experimental component
+
+A standalone C++17 `SequenceGuard` now lives in
+[`engine/sequence_guard.hpp`](engine/sequence_guard.hpp), with a
+[regression test](tests/sequence_guard_native_test.cpp) covering duplicate
+rejection, gaps, snapshot-based resynchronization, and commit-after-book
+state updates. The CI workflow is configured to compile and execute this
+test. **The Python `SequencedBook` is still the active application path**;
+the native guard is not yet integrated into the live stream, and a passing
+CI result for the new test has not yet been checked.
+
+Integration, Python/native parity testing, native fanout, and measured
+p50/p95/p99 C++ update latency are remaining tasks. Do not describe them
+as delivered capabilities or add C++ sequencing benchmark numbers to the CV.
+
 ## Roadmap beyond v1.0
 
 Cross-instance message distribution, persistent PostgreSQL deployment when affordable, genuine end-to-end load tests under controlled conditions, structured event logs and advanced native-engine property tests.
